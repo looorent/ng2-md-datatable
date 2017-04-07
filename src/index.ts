@@ -6,3 +6,4 @@ export * from './md-datatable-column.component';
 export * from './md-datatable-header.component';
 export * from './md-datatable-pagination.component';
 export * from './md-datatable-row.component';
+export * from './md-datatable-cell.directive';

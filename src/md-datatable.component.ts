@@ -1,25 +1,39 @@
 import {
   Component,
-  AfterContentInit,
+  OnInit,
+  AfterViewInit,
   Input,
   Output,
-  OnDestroy,
   EventEmitter,
   ContentChild,
   ContentChildren,
-  QueryList
+  QueryList,
+  Inject,
 } from '@angular/core';
 
-import { Subscription } from 'rxjs/Subscription';
+import { Store } from '@ngrx/store';
+import { Observable } from 'rxjs/Observable';
 
 import {
-  IDatatableCheckEvent,
+  IDatatablesState,
   IDatatableSelectionEvent,
   IDatatableSortEvent,
+  DatatableSortType,
 } from './md-datatable.interfaces';
 
 import { MdDataTableHeaderComponent } from './md-datatable-header.component';
 import { MdDataTableRowComponent } from './md-datatable-row.component';
+import { BaseComponent, MD_DATATABLE_STORE } from './helpers';
+import { MdDatatableActions } from './md-datatable.actions';
+
+import {
+  getSelectedValues,
+  areAllRowsSelected,
+  getSortBy,
+  getSortType,
+} from './md-datatable.reducer';
+
+let instanceId = 0;
 
 @Component({
   selector: 'ng2-md-datatable',
@@ -30,96 +44,69 @@ import { MdDataTableRowComponent } from './md-datatable-row.component';
   `,
   styleUrls: ['md-datatable.component.css']
 })
-export class MdDataTableComponent implements AfterContentInit, OnDestroy {
-  private _selectable = false;
-
-  @Input()
-  set selectable(val: boolean) {
-    this._selectable = JSON.parse(String(val));
-  }
-
-  get selectable(): boolean { return this._selectable; };
+export class MdDataTableComponent extends BaseComponent implements OnInit, AfterViewInit {
+  @Input() selectable: boolean;
 
   @Output() selectionChange: EventEmitter<IDatatableSelectionEvent>;
   @Output() sortChange: EventEmitter<IDatatableSortEvent>;
 
-  private subscriptions: Subscription[];
+  @ContentChild(MdDataTableHeaderComponent) headerCmp: MdDataTableHeaderComponent;
+  @ContentChildren(MdDataTableRowComponent) rowsCmp: QueryList<MdDataTableRowComponent>;
 
-  @ContentChild(MdDataTableHeaderComponent) header: MdDataTableHeaderComponent;
-  @ContentChildren(MdDataTableRowComponent) rows: QueryList<MdDataTableRowComponent>;
+  id = `md-datatable-${instanceId++}`;
 
-  constructor() {
-    this.selectionChange = new EventEmitter<IDatatableSelectionEvent>(true); // async
-    this.sortChange = new EventEmitter<IDatatableSortEvent>(true); // async
-    this.subscriptions = [];
+  constructor(
+    @Inject(MD_DATATABLE_STORE) private store: Store<IDatatablesState>,
+    private actions: MdDatatableActions,
+  ) {
+    super();
+    this.selectionChange = new EventEmitter<IDatatableSelectionEvent>(true);
+    this.sortChange = new EventEmitter<IDatatableSortEvent>(true);
   }
 
-  ngAfterContentInit() {
-    // propagate header select-all-rows events
-    if (this.selectable && this.header) {
-      this.subscriptions.push(
-        this.header.allChecked$
-          .subscribe((allChecked: boolean) => this.onAllCheckedEvent.call(this, allChecked))
-      );
+  ngOnInit() {
+    // trick for supporting selectable attribute without a value
+    this.selectable = !!this.selectable || (this.selectable as any) === '';
+
+    // if selectable, subscribe to selection changes and emit IDatatableSelectionEvent
+    if (this.selectable) {
+      this.store
+        .let(getSelectedValues(this.id))
+        .mergeMap(
+        () => this.store.let(areAllRowsSelected(this.id)),
+        (selectedValues: string[], allRowsSelected: boolean) => (<IDatatableSelectionEvent>{
+          allRowsSelected,
+          selectedValues,
+        }))
+        .do((e: IDatatableSelectionEvent) => console.log(`Emitting ${JSON.stringify(e)}`))
+        .subscribe(this.selectionChange);
     }
 
-    // propagate header sort events
-    if (this.header) {
-      this.subscriptions.push(
-        this.header.sort$.subscribe((sort: IDatatableSortEvent) => this.sortChange.emit(sort))
-      );
+    // subscribe to sort changes and emit IDatatableSortEvent
+    this.store
+      .let(getSortBy(this.id))
+      .combineLatest(
+      this.store.let(getSortType(this.id)),
+      (sortBy: string, sortType: DatatableSortType) => (<IDatatableSortEvent>{
+        sortBy,
+        sortType,
+      }))
+      .do((e: IDatatableSortEvent) => console.log(`Emitting ${JSON.stringify(e)}`))
+      .subscribe(this.sortChange);
+  }
+
+  ngAfterViewInit() {
+    // when datatable is selectable, update its state with all the selectable values
+    if (this.selectable && this.rowsCmp) {
+      this.rowsCmp.changes
+        .mergeMap((query: QueryList<MdDataTableRowComponent>) => Observable
+          .of(query
+            .toArray()
+            .map((row: MdDataTableRowComponent) => row.selectableValue))
+        )
+        .takeUntil(this.unmount$)
+        .subscribe((selectableValues: string[]) => this.store.dispatch(
+          this.actions.updateSelectableValues(this.id, selectableValues)));
     }
-
-    // propagate row select events
-    if (this.selectable && this.rows) {
-      this.subscriptions.push(
-        this.rows.changes
-          .switchMap((changes: QueryList<MdDataTableRowComponent>) => changes.toArray())
-          .filter((row: MdDataTableRowComponent) => row.selectable)
-          .mergeMap((row: MdDataTableRowComponent) => row.check$)
-          .filter((check: IDatatableCheckEvent) => check.propagate)
-          .subscribe((check: IDatatableCheckEvent) => this.onRowCheckEvent.call(this, check))
-      );
-    }
-  }
-
-  ngOnDestroy() {
-    this.subscriptions.forEach((subscription: Subscription) => subscription.unsubscribe());
-  }
-
-  private onRowCheckEvent(check: IDatatableCheckEvent) {
-    this.selectionChange.emit({
-      allRowsSelected: this.areAllRowsSelected(),
-      selectedValues: this.getSelectedValues(),
-    });
-  }
-
-  private onAllCheckedEvent(allChecked: boolean) {
-    this.rows
-      .toArray()
-      .filter((row: MdDataTableRowComponent) => row.selectable && row.isChecked !== allChecked)
-      .forEach((row: MdDataTableRowComponent) => row.setCheck(allChecked));
-
-    this.selectionChange.emit({
-      allRowsSelected: this.areAllRowsSelected(),
-      selectedValues: this.getSelectedValues(),
-    });
-  }
-
-  private getSelectedValues() {
-    return this.rows
-      .toArray()
-      .filter((row: MdDataTableRowComponent) => row.isChecked)
-      .map((row: MdDataTableRowComponent) => row.selectableValue);
-  }
-
-  private areAllRowsSelected() {
-    const rows = this.rows.toArray();
-
-    if (rows.length === 0) {
-      return false;
-    }
-
-    return this.getSelectedValues().length === rows.length;
   }
 }

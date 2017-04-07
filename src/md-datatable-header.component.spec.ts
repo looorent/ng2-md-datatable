@@ -1,15 +1,23 @@
 import { async, TestBed } from '@angular/core/testing';
 import { MaterialModule } from '@angular/material';
-import { MdDataTableHeaderComponent } from './md-datatable-header.component';
 
-describe('MdDatatableHeaderCmp', () => {
+import { MdDataTableHeaderComponent } from './md-datatable-header.component';
+import { customFeatureStoreModule } from './helpers';
+import { datatableReducer, initialState } from './md-datatable.reducer';
+import { MdDatatableActions } from './md-datatable.actions';
+
+describe('MdDataTableHeaderComponent', () => {
   beforeEach(async(() => {
     TestBed.configureTestingModule({
       imports: [
         MaterialModule,
+        customFeatureStoreModule(datatableReducer, initialState),
       ],
       declarations: [
         MdDataTableHeaderComponent,
+      ],
+      providers: [
+        { provide: MdDatatableActions, useClass: MdDatatableActions },
       ],
     }).compileComponents();
   }));

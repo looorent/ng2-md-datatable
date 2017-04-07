@@ -1,0 +1,27 @@
+<h1>
+  {{title}}
+</h1>
+
+<ng2-md-datatable selectable="true">
+  <ng2-md-datatable-header>
+    <ng2-md-datatable-column sortableValue="id" numeric>Id</ng2-md-datatable-column>
+    <ng2-md-datatable-column sortableValue="name">Name</ng2-md-datatable-column>
+    <ng2-md-datatable-column sortableValue="design">Design by</ng2-md-datatable-column>
+    <ng2-md-datatable-column sortableValue="size">Available size</ng2-md-datatable-column>
+  </ng2-md-datatable-header>
+  <tbody>
+    <ng2-md-datatable-row *ngFor="let tshirt of tshirts" [selectableValue]="tshirt.id">
+      <td>{{ tshirt.id }}</td>
+      <td>{{ tshirt.name }}</td>
+      <td>{{ tshirt.design }}</td>
+      <td>{{ tshirt.size }}</td>
+    </ng2-md-datatable-row>
+  </tbody>
+</ng2-md-datatable>
+
+<ng2-md-datatable-pagination
+  itemsPerPage="0"
+  currentPage="1"
+  [itemsCount]="tshirts.length"
+  [itemsPerPageChoices]="[5, 10, 15]"
+  itemsPerPageFirstChoice="5"></ng2-md-datatable-pagination>
