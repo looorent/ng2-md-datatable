@@ -14,7 +14,7 @@ This may be useful for you (or not).
 
 ## Working with
 - Angular 2.x
-- Material 2 Beta 2
+- Material 2 Beta 3
 
 ## Installation
 To use ng2-md-datatable in your project install it via [npm](https://www.npmjs.com/package/ng2-md-datatable):
@@ -111,4 +111,4 @@ To add `ng2-md-datatable` to your Material 2 theming file:
 @include mat-datatable-theme($theme);
 ```
 
-This is based on the [current guide](https://github.com/angular/material2/blob/master/guides/theming.md) for theming components with Material 2 Beta 2.
+This is based on the [current guide](https://github.com/angular/material2/blob/master/guides/theming.md) for theming components with Material 2 Beta 3.
